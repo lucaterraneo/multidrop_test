@@ -8,7 +8,7 @@ Two single-solenoid valves on an Arduino **Opta** + **D1608S** solid-state expan
 [![C++](https://img.shields.io/badge/C%2B%2B-firmware-00599C?logo=cplusplus&logoColor=white)](#)
 [![Status](https://img.shields.io/badge/status-preliminary%20test-yellow)](#current-limits)
 
-Each machine has its own start and stop button. The dropper also follows a position switch while it is stopped.
+Two external 24 V illuminated buttons (drop, back test) start and stop the two pneumatic programs; either button's press stops both if one is running. Each button's own LED lights while that program runs. The dropper still follows a position switch while it is stopped. I7 reads the 24 V that already feeds the multidrum motor contactor.
 
 > [!IMPORTANT]
 > After every change: **Verify → Upload** to the Opta.  
@@ -37,6 +37,8 @@ multidrop_test/
 ├── Config.h              # pins, SSR indices, timings
 ├── Dropper.h/.cpp        # M1 dropper valve, buttons, LEDs
 ├── SteeringDisc.h/.cpp   # M2 steering-disc valve, buttons, LEDs
+├── DrumMotor.h/.cpp      # Multidrum motor: I7 reads the contactor 24 V
+├── Button.h/.cpp         # External 24 V NO button, debounced press edge
 └── README.md
 ```
 
@@ -44,36 +46,53 @@ multidrop_test/
 flowchart LR
   subgraph HMI
     DS[Drop switch]
-    DB[Dropper start / stop]
-    SB[Disc start / stop]
+    DB[Dropper button + LED]
+    SB[Disc button + LED]
+    MS[Motor 24 V feed-through]
   end
 
   subgraph FW["Firmware"]
     DR[Dropper]
     SD[SteeringDisc]
+    DM[DrumMotor]
     CFG[Config.h]
   end
 
   subgraph VALVE["D1608S SSR"]
     V1[Dropper coil]
     V2[Disc coil]
+    L1[Dropper button LED]
+    L2[Disc button LED]
+  end
+
+  subgraph POWER["Contactor"]
+    C1[24 V coil]
+    C2[230 V motor]
   end
 
   DS --> DR
   DB --> DR
   SB --> SD
+  MS --> DM
+  MS --> C1
+  C1 --> C2
   CFG -.-> DR
   CFG -.-> SD
+  CFG -.-> DM
   DR --> V1
   SD --> V2
+  DR --> L1
+  SD --> L2
 ```
 
 | Module | Role |
 |---|---|
 | `multidrop_test.ino` | Composition root: Opta, expansion, `setup()`, `loop()` |
 | `Config.h` | Constants (it is not a class) |
-| `Dropper` | Start / stop, 2.5 s toggle, follow the position switch when stopped |
-| `SteeringDisc` | Start / stop, 2 s toggle, valve off when stopped |
+| `Dropper` | Start / stop, 1 s toggle, follow the position switch when stopped |
+| `SteeringDisc` | Start / stop, 1 s toggle, valve off when stopped |
+| `DrumMotor` | Reads I7: HIGH means 24 V is on the contactor coil |
+| `Button` | Debounces one external 24 V NO button, reports the press edge once |
 
 ---
 
@@ -87,17 +106,31 @@ Software SSR indices: **0 = first relay** of the expansion.
 
 | Function | Pin / SSR | Notes |
 |---|---|---|
-| Dropper valve | SSR 0 | 24 V on the coil when the output is HIGH |
-| Steering disc valve | SSR 1 | 24 V on the coil when the output is HIGH |
+| Dropper valve | SSR 0 (O1) | 24 V on the coil when the output is HIGH |
+| Steering disc valve | SSR 1 (O2) | 24 V on the coil when the output is HIGH |
+| Dropper button LED | SSR 2 (O3) | lit (HIGH) while the dropper runs |
+| Disc button LED | SSR 3 (O4) | lit (HIGH) while back test runs |
 | Drop position switch | `A0` (I1) | HIGH = bottom, LOW = top |
-| Dropper start | `A1` (I2) | 24 V when pressed |
-| Dropper stop | `A2` (I3) | 24 V when pressed |
-| Disc start | `A3` (I4) | 24 V when pressed |
-| Disc stop | `A4` (I5) | 24 V when pressed |
-| Dropper green / red | `LED_D0` / `LED_D1` | on-board Opta LEDs |
-| Disc green / red | `LED_D2` / `LED_D3` | on-board Opta LEDs |
+| Dropper button | `A1` (I2) | external 24 V illuminated NO button, HIGH when pressed |
+| Disc button | `A2` (I3) | external 24 V illuminated NO button, HIGH when pressed |
+| Motor 24 V | `A6` (I7) | Parallel feed-through: same 24 V as the contactor coil |
 
-Green is on while that machine runs. Red is on while it is stopped.
+Each button is a TRU-style illuminated NO pushbutton with a built-in 12 V
+red/green LED. Only the green leg is used. On the panel each button already
+has its own 380 Ω resistor in series toward +24 V, dropping the LED to its
+~12 V rating.
+
+Wiring a button's LED is the same pattern as a valve coil, just switching a
+lamp instead of a solenoid:
+
+```text
++24 V ──> [D1608S SSR output, O3 or O4] ──> 380 Ω resistor ──> LED (green leg, + ) ──> 0 V / COM
+```
+
+The SSR channel is a plain isolated contact (like a relay), in series with
+the loop — polarity only matters at the LED itself (current must flow from
+its anode to its cathode). The button's unused red leg stays disconnected.
+Return (0 V/COM) is the same rail already used by the two valve coils.
 
 On each valve:
 
@@ -106,27 +139,53 @@ On each valve:
 | solenoid on | HIGH, 24 V on the coil |
 | solenoid off | LOW, coil off |
 
-The old Arduino Uno pins and the Finder 5 V → 24 V sockets are not used.
+The old Arduino Uno pins, the Finder 5 V → 24 V sockets, and the on-board
+USER button / Opta LEDs are not used.
 
 ---
 
 ## Machine behavior
 
-The two machines are independent. Pressing start or stop on one does not change the other.
+The two valves are independent of the motor. The Opta does not switch the contactor.
+
+### Buttons
+
+Each button is debounced (`BUTTON_DEBOUNCE_MS`) and reports a single press
+on the rising edge (24 V = pressed).
+
+| Button | Idle | A pneumatic program running |
+|---|---|---|
+| Dropper | start dropper (LED on) | stop dropper and back test (both LEDs off) |
+| Back test | start back test (LED on) | stop dropper and back test (both LEDs off) |
+
+Either button stops both programs first if one is already running — a
+button never starts a second program on top of a running one.
+
+### Multidrum motor
+
+Two feed-through terminals are tied together. One feeds 24 V DC to the contactor coil (the contactor closes 230 V AC to the motor). The other goes to Opta **I7**.
+
+- **I7 HIGH:** 24 V is on the coil.
+- **I7 LOW:** coil off.
+- No SSR. The firmware only reads the signal.
+- Drum revolutions are counted from I7 on-time at 75 rpm (1500 U/min ÷ 20). No encoder.
+- Cylinder diameter 250 mm → ≈ 0.785 m per revolution.
+- USB serial (115200) prints wheelchair-drum **rotations** and **km** every second while I7 is HIGH.
+- I7 LOW prints the totals, then resets to 0. The next motor-on starts from zero.
 
 ### Dropper
 
-- **Start:** begins the 2.5 s toggle from the current valve state.
+- **Start:** solenoid on, then on/off every `DROPPER_INTERVAL_MS` (500 ms).
 - **Running:** the SSR flips every `DROPPER_INTERVAL_MS`. HIGH is the bottom command.
 - **Stop:** commands the bottom position, then follows the position switch.
 - **Stopped:** if the switch changes, the valve follows it. HIGH on I1 means bottom.
 
 ### Steering disc
 
-- **Start:** forces the valve off, then flips every `DISC_INTERVAL_MS`.
+- **Start:** solenoid on, then on/off every `DISC_INTERVAL_MS` (500 ms).
 - **Stop:** valve off.
 
-The main loop waits `LOOP_DELAY_MS` (20 ms) between passes. That pause is the only button filtering.
+The main loop waits `LOOP_DELAY_MS` (20 ms) between passes. Each button has its own debounce (`BUTTON_DEBOUNCE_MS`).
 
 ---
 
@@ -138,17 +197,14 @@ The main loop waits `LOOP_DELAY_MS` (20 ms) between passes. That pause is the on
 
 ```cpp
 namespace Pins {
-    constexpr int DROP_SWITCH   = A0;  // I1
-    constexpr int DROPPER_START = A1;  // I2
-    constexpr int DROPPER_STOP  = A2;  // I3
-    constexpr int DISC_START    = A3;  // I4
-    constexpr int DISC_STOP     = A4;  // I5
-    constexpr int DROPPER_GREEN = LED_D0;
-    constexpr int DROPPER_RED   = LED_D1;
-    constexpr int DISC_GREEN    = LED_D2;
-    constexpr int DISC_RED      = LED_D3;
-    constexpr int DROPPER_SSR   = 0;
-    constexpr int DISC_SSR      = 1;
+    constexpr int DROP_SWITCH    = A0;  // I1
+    constexpr int DROPPER_BUTTON = A1;  // I2
+    constexpr int DISC_BUTTON    = A2;  // I3
+    constexpr int MOTOR_SWITCH   = A6;  // I7
+    constexpr int DROPPER_SSR     = 0;  // O1
+    constexpr int DISC_SSR        = 1;  // O2
+    constexpr int DROPPER_LED_SSR = 2;  // O3
+    constexpr int DISC_LED_SSR    = 3;  // O4
 }
 ```
 
@@ -156,11 +212,22 @@ namespace Pins {
 
 | Constant | Default | Use |
 |---|---|---|
-| `DROPPER_INTERVAL_MS` | 2500 | dropper toggle |
-| `DISC_INTERVAL_MS` | 2000 | steering-disc toggle |
+| `DROPPER_INTERVAL_MS` | 1000 | dropper on/off half-period |
+| `DISC_INTERVAL_MS` | 1000 | back-test on/off half-period |
 | `LOOP_DELAY_MS` | 20 | pause at the end of `loop()` |
+| `BUTTON_DEBOUNCE_MS` | 40 | debounce for both external buttons |
 
 `USE_POT` is `false`. The steering-disc interval stays fixed. A5 (I6) is reserved if the potentiometer is enabled later.
+
+### Motor kinematics
+
+| Constant | Default | Use |
+|---|---|---|
+| `Motor::RPM` | 1500 | motor shaft |
+| `Motor::GEAR_RATIO` | 20 | 20:1 gearbox |
+| `Motor::DRUM_DIAMETER_MM` | 250 | cylinder |
+| `Motor::DRUM_RPM` | 75 | cylinder = RPM / GEAR_RATIO |
+| `Timing::MOTOR_REPORT_MS` | 1000 | serial print interval |
 
 ---
 
@@ -188,6 +255,4 @@ On macOS the port is often `/dev/cu.usbmodem*`.
 
 It works as a **preliminary test**. Not yet present:
 
-- [ ] 5 V LED buttons. Opta digital inputs turn on at 6.6 V, so a 5 V contact does not read as HIGH
 - [ ] Potentiometer interval (`USE_POT` is off)
-- [ ] Debounce beyond the 20 ms loop pause

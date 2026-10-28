@@ -13,20 +13,14 @@ private:
 
     DigitalStSolidExpansion* expansion;
     int ssr;
-    int startPin;
-    int stopPin;
-    int greenPin;
-    int redPin;
+    int ledSsr;
 
     bool running;
     bool solenoidOn;
-    bool lastStart;
-    bool lastStop;
     unsigned long lastToggleMs;
 
     void writeValve();
-    void writeLeds();
-    void handleButtons();
+    void writeLed();
     void runCycle();
     unsigned long intervalMs() const;
 
@@ -35,14 +29,13 @@ public:
     SteeringDisc(
         DigitalStSolidExpansion* expansion,
         int ssr,
-        int startPin,
-        int stopPin,
-        int greenPin,
-        int redPin
+        int ledSsr
     );
 
     void begin();
     void update();
+    void start();
+    void stop();
     bool isRunning() const;
 };
 

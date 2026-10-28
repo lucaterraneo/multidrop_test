@@ -14,21 +14,15 @@ private:
     DigitalStSolidExpansion* expansion;
     int ssr;
     int switchPin;
-    int startPin;
-    int stopPin;
-    int greenPin;
-    int redPin;
+    int ledSsr;
 
     bool running;
     bool solenoidOn;
     bool lastSwitchBottom;
-    bool lastStart;
-    bool lastStop;
     unsigned long lastToggleMs;
 
     void writeValve();
-    void writeLeds();
-    void handleButtons();
+    void writeLed();
     void runCycle();
     void followSwitch();
 
@@ -38,14 +32,13 @@ public:
         DigitalStSolidExpansion* expansion,
         int ssr,
         int switchPin,
-        int startPin,
-        int stopPin,
-        int greenPin,
-        int redPin
+        int ledSsr
     );
 
     void begin();
     void update();
+    void start();
+    void stop();
     bool isRunning() const;
 };
 

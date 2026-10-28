@@ -4,22 +4,14 @@
 SteeringDisc::SteeringDisc(
     DigitalStSolidExpansion* expansion,
     int ssr,
-    int startPin,
-    int stopPin,
-    int greenPin,
-    int redPin
+    int ledSsr
 ) {
     this->expansion = expansion;
     this->ssr = ssr;
-    this->startPin = startPin;
-    this->stopPin = stopPin;
-    this->greenPin = greenPin;
-    this->redPin = redPin;
+    this->ledSsr = ledSsr;
 
     running = false;
     solenoidOn = false;
-    lastStart = LOW;
-    lastStop = LOW;
     lastToggleMs = 0;
 }
 
@@ -29,43 +21,16 @@ void SteeringDisc::writeValve() {
     expansion->updateDigitalOutputs();
 }
 
-void SteeringDisc::writeLeds() {
-    digitalWrite(greenPin, running ? HIGH : LOW);
-    digitalWrite(redPin, running ? LOW : HIGH);
+void SteeringDisc::writeLed() {
+    // Same SSR pattern, driving the button's LED instead of a coil.
+    expansion->digitalWrite(ledSsr, running ? HIGH : LOW);
+    expansion->updateDigitalOutputs();
 }
 
 void SteeringDisc::begin() {
-    pinMode(startPin, INPUT);
-    pinMode(stopPin, INPUT);
-    pinMode(greenPin, OUTPUT);
-    pinMode(redPin, OUTPUT);
-
     solenoidOn = false;
     writeValve();
-    writeLeds();
-}
-
-void SteeringDisc::handleButtons() {
-    bool startNow = digitalRead(startPin);
-    bool stopNow = digitalRead(stopPin);
-
-    // 24 V on the input is a press.
-    if (lastStart == LOW && startNow == HIGH) {
-        running = true;
-        solenoidOn = false;
-        writeValve();
-        lastToggleMs = millis();
-    }
-
-    if (lastStop == LOW && stopNow == HIGH) {
-        running = false;
-        solenoidOn = false;
-        writeValve();
-    }
-
-    lastStart = startNow;
-    lastStop = stopNow;
-    writeLeds();
+    writeLed();
 }
 
 unsigned long SteeringDisc::intervalMs() const {
@@ -98,8 +63,22 @@ void SteeringDisc::runCycle() {
     lastToggleMs = now;
 }
 
+void SteeringDisc::start() {
+    running = true;
+    solenoidOn = true;
+    writeValve();
+    lastToggleMs = millis();
+    writeLed();
+}
+
+void SteeringDisc::stop() {
+    running = false;
+    solenoidOn = false;
+    writeValve();
+    writeLed();
+}
+
 void SteeringDisc::update() {
-    handleButtons();
     runCycle();
 }
 

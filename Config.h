@@ -16,27 +16,39 @@ namespace Config {
         // HIGH = dropper at the bottom, LOW = at the top
         constexpr int DROP_SWITCH   = A0;  // I1
 
-        constexpr int DROPPER_START = A1;  // I2
-        constexpr int DROPPER_STOP  = A2;  // I3
-        constexpr int DISC_START    = A3;  // I4
-        constexpr int DISC_STOP     = A4;  // I5
+        // External 24 V illuminated NO buttons. HIGH = pressed.
+        constexpr int DROPPER_BUTTON = A1;  // I2
+        constexpr int DISC_BUTTON   = A2;  // I3
 
-        // On-board Opta LEDs. HIGH = lit.
-        constexpr int DROPPER_GREEN = LED_D0;
-        constexpr int DROPPER_RED   = LED_D1;
-        constexpr int DISC_GREEN    = LED_D2;
-        constexpr int DISC_RED      = LED_D3;
+        // Feed-through: same 24 V that feeds the contactor coil.
+        constexpr int MOTOR_SWITCH  = A6;  // I7
 
         // D1608S solid-state relays, 24 V straight to the valve coil.
-        constexpr int DROPPER_SSR   = 0;
-        constexpr int DISC_SSR      = 1;
+        constexpr int DROPPER_SSR     = 0;  // O1
+        constexpr int DISC_SSR        = 1;  // O2
+
+        // Same expansion, driving each button's built-in LED (through its
+        // own series resistor). On = lit while that program is running.
+        constexpr int DROPPER_LED_SSR = 2;  // O3
+        constexpr int DISC_LED_SSR    = 3;  // O4
     }
 
     namespace Timing {
 
-        constexpr unsigned long DROPPER_INTERVAL_MS = 2500;
-        constexpr unsigned long DISC_INTERVAL_MS    = 2000;
+        constexpr unsigned long DROPPER_INTERVAL_MS = 1000;
+        constexpr unsigned long DISC_INTERVAL_MS    = 1000;
         constexpr unsigned long LOOP_DELAY_MS       = 20;
+        constexpr unsigned long MOTOR_REPORT_MS     = 1000;
+        constexpr unsigned long BUTTON_DEBOUNCE_MS  = 40;
+    }
+
+    // Drum speed from I7 on-time. No encoder: 1500 U/min / 20:1 = 75 rpm.
+    namespace Motor {
+
+        constexpr float RPM            = 1500.0f;
+        constexpr float GEAR_RATIO     = 20.0f;
+        constexpr float DRUM_DIAMETER_MM = 250.0f;
+        constexpr float DRUM_RPM       = RPM / GEAR_RATIO;
     }
 
     // Optional pot for the steering-disc interval. Off unless you wire it to I6.

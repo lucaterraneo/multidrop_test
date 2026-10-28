@@ -5,24 +5,16 @@ Dropper::Dropper(
     DigitalStSolidExpansion* expansion,
     int ssr,
     int switchPin,
-    int startPin,
-    int stopPin,
-    int greenPin,
-    int redPin
+    int ledSsr
 ) {
     this->expansion = expansion;
     this->ssr = ssr;
     this->switchPin = switchPin;
-    this->startPin = startPin;
-    this->stopPin = stopPin;
-    this->greenPin = greenPin;
-    this->redPin = redPin;
+    this->ledSsr = ledSsr;
 
     running = false;
     solenoidOn = false;
     lastSwitchBottom = false;
-    lastStart = LOW;
-    lastStop = LOW;
     lastToggleMs = 0;
 }
 
@@ -32,44 +24,19 @@ void Dropper::writeValve() {
     expansion->updateDigitalOutputs();
 }
 
-void Dropper::writeLeds() {
-    digitalWrite(greenPin, running ? HIGH : LOW);
-    digitalWrite(redPin, running ? LOW : HIGH);
+void Dropper::writeLed() {
+    // Same SSR pattern, driving the button's LED instead of a coil.
+    expansion->digitalWrite(ledSsr, running ? HIGH : LOW);
+    expansion->updateDigitalOutputs();
 }
 
 void Dropper::begin() {
     pinMode(switchPin, INPUT);
-    pinMode(startPin, INPUT);
-    pinMode(stopPin, INPUT);
-    pinMode(greenPin, OUTPUT);
-    pinMode(redPin, OUTPUT);
 
     lastSwitchBottom = digitalRead(switchPin) == HIGH;
     solenoidOn = lastSwitchBottom;
     writeValve();
-    writeLeds();
-}
-
-void Dropper::handleButtons() {
-    bool startNow = digitalRead(startPin);
-    bool stopNow = digitalRead(stopPin);
-
-    // 24 V on the input is a press.
-    if (lastStart == LOW && startNow == HIGH) {
-        running = true;
-        lastToggleMs = millis();
-    }
-
-    if (lastStop == LOW && stopNow == HIGH) {
-        running = false;
-        solenoidOn = true;
-        writeValve();
-        lastSwitchBottom = digitalRead(switchPin) == HIGH;
-    }
-
-    lastStart = startNow;
-    lastStop = stopNow;
-    writeLeds();
+    writeLed();
 }
 
 void Dropper::runCycle() {
@@ -102,8 +69,23 @@ void Dropper::followSwitch() {
     writeValve();
 }
 
+void Dropper::start() {
+    running = true;
+    solenoidOn = true;
+    writeValve();
+    lastToggleMs = millis();
+    writeLed();
+}
+
+void Dropper::stop() {
+    running = false;
+    solenoidOn = true;
+    writeValve();
+    lastSwitchBottom = digitalRead(switchPin) == HIGH;
+    writeLed();
+}
+
 void Dropper::update() {
-    handleButtons();
     runCycle();
     followSwitch();
 }
