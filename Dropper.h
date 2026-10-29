@@ -6,7 +6,8 @@
 
 using namespace Opta;
 
-// M1 dropper. When stopped, the valve follows the position switch.
+// M1 dropper. When stopped, the valve follows the position switch,
+// unless inhibited (the multidrum motor is running).
 class Dropper {
 
 private:
@@ -36,7 +37,7 @@ public:
     );
 
     void begin();
-    void update();
+    void update(bool inhibited);
     void start();
     void stop();
     bool isRunning() const;

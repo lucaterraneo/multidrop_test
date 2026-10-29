@@ -85,7 +85,7 @@ void loop() {
         Serial.println("dropper stopped: multidrum running");
     }
 
-    dropper.update();
+    dropper.update(drumMotor.isOn());
     steeringDisc.update();
     delay(Config::Timing::LOOP_DELAY_MS);
 }

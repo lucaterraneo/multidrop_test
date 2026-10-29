@@ -86,8 +86,13 @@ void Dropper::stop() {
     writeLed();
 }
 
-void Dropper::update() {
+void Dropper::update(bool inhibited) {
     runCycle();
+
+    if (inhibited) {
+        return;
+    }
+
     followSwitch();
 }
 

@@ -166,11 +166,15 @@ on the rising edge (24 V = pressed).
 Either button stops both programs first if one is already running — a
 button never starts a second program on top of a running one.
 
-**Interlock:** the dropper cannot run while the multidrum motor (I7) is on.
+**Interlock:** the dropper cannot be actuated at all while the multidrum
+motor (I7) is on — neither by the button nor by the I4 position switch.
 The dropper button is ignored (`dropper blocked: multidrum running`) while
 the motor runs, and if the motor starts while the dropper is already
 running, the dropper is force-stopped (`dropper stopped: multidrum
-running`). Back test has no such restriction and can run with the motor on.
+running`). While the motor is on, the I4 switch is also ignored — moving it
+does not move the valve. As soon as the motor turns off, the switch is
+read again and the valve catches up to its current position. Back test has
+no such restriction and can run with the motor on.
 
 ### Multidrum motor
 
@@ -189,7 +193,7 @@ Two feed-through terminals are tied together. One feeds 24 V DC to the contactor
 - **Start:** solenoid on, then on/off every `DROPPER_INTERVAL_MS` (500 ms).
 - **Running:** the SSR flips every `DROPPER_INTERVAL_MS`. The I4 switch is ignored while running.
 - **Stop:** commands the up position, then follows the I4 switch.
-- **Stopped:** if the switch changes, the valve follows it. HIGH on I4 means up (solenoid on); LOW means down (solenoid off). Each change prints `dropper switch: UP` / `DOWN` to serial.
+- **Stopped:** if the switch changes, the valve follows it — unless the multidrum motor is on, in which case the switch is ignored. HIGH on I4 means up (solenoid on); LOW means down (solenoid off). Each change prints `dropper switch: UP` / `DOWN` to serial.
 
 ### Steering disc
 
