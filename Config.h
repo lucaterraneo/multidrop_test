@@ -13,12 +13,13 @@ namespace Config {
 
     namespace Pins {
 
-        // HIGH = dropper at the bottom, LOW = at the top
-        constexpr int DROP_SWITCH   = A0;  // I1
-
         // External 24 V illuminated NO buttons. HIGH = pressed.
         constexpr int DROPPER_BUTTON = A1;  // I2
         constexpr int DISC_BUTTON   = A2;  // I3
+
+        // Manual position switch, active while the dropper is stopped.
+        // HIGH = up, solenoid activated. LOW = down, solenoid off. I1 is unused.
+        constexpr int DROP_SWITCH   = A3;  // I4
 
         // Feed-through: same 24 V that feeds the contactor coil.
         constexpr int MOTOR_SWITCH  = A6;  // I7
@@ -40,6 +41,9 @@ namespace Config {
         constexpr unsigned long LOOP_DELAY_MS       = 20;
         constexpr unsigned long MOTOR_REPORT_MS     = 1000;
         constexpr unsigned long BUTTON_DEBOUNCE_MS  = 40;
+
+        // Minimum change before a new pot reading is printed to serial.
+        constexpr unsigned long POT_REPORT_DELTA_MS = 20;
     }
 
     // Drum speed from I7 on-time. No encoder: 1500 U/min / 20:1 = 75 rpm.
@@ -51,9 +55,9 @@ namespace Config {
         constexpr float DRUM_RPM       = RPM / GEAR_RATIO;
     }
 
-    // Optional pot for the steering-disc interval. Off unless you wire it to I6.
-    constexpr bool USE_POT = false;
-    constexpr int POT_PIN = A5;
+    // 10 k pot on I5 sets the back-test (steering disc) stroke time.
+    constexpr bool USE_POT = true;
+    constexpr int POT_PIN = A4;  // I5
     constexpr unsigned long POT_INTERVAL_MIN_MS = 500;
     constexpr unsigned long POT_INTERVAL_MAX_MS = 4000;
 

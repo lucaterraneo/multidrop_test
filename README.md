@@ -48,6 +48,7 @@ flowchart LR
     DS[Drop switch]
     DB[Dropper button + LED]
     SB[Disc button + LED]
+    POT[Back-test pot]
     MS[Motor 24 V feed-through]
   end
 
@@ -73,6 +74,7 @@ flowchart LR
   DS --> DR
   DB --> DR
   SB --> SD
+  POT --> SD
   MS --> DM
   MS --> C1
   C1 --> C2
@@ -110,10 +112,13 @@ Software SSR indices: **0 = first relay** of the expansion.
 | Steering disc valve | SSR 1 (O2) | 24 V on the coil when the output is HIGH |
 | Dropper button LED | SSR 2 (O3) | lit (HIGH) while the dropper runs |
 | Disc button LED | SSR 3 (O4) | lit (HIGH) while back test runs |
-| Drop position switch | `A0` (I1) | HIGH = bottom, LOW = top |
 | Dropper button | `A1` (I2) | external 24 V illuminated NO button, HIGH when pressed |
 | Disc button | `A2` (I3) | external 24 V illuminated NO button, HIGH when pressed |
+| Drop position switch | `A3` (I4) | HIGH = up, solenoid activated. LOW = down, solenoid off |
+| Back-test stroke pot | `A4` (I5) | 10 kΩ pot, sets the back-test toggle half-period |
 | Motor 24 V | `A6` (I7) | Parallel feed-through: same 24 V as the contactor coil |
+
+I1 is unused.
 
 Each button is a TRU-style illuminated NO pushbutton with a built-in 12 V
 red/green LED. Only the green leg is used. On the panel each button already
@@ -161,6 +166,12 @@ on the rising edge (24 V = pressed).
 Either button stops both programs first if one is already running — a
 button never starts a second program on top of a running one.
 
+**Interlock:** the dropper cannot run while the multidrum motor (I7) is on.
+The dropper button is ignored (`dropper blocked: multidrum running`) while
+the motor runs, and if the motor starts while the dropper is already
+running, the dropper is force-stopped (`dropper stopped: multidrum
+running`). Back test has no such restriction and can run with the motor on.
+
 ### Multidrum motor
 
 Two feed-through terminals are tied together. One feeds 24 V DC to the contactor coil (the contactor closes 230 V AC to the motor). The other goes to Opta **I7**.
@@ -176,14 +187,15 @@ Two feed-through terminals are tied together. One feeds 24 V DC to the contactor
 ### Dropper
 
 - **Start:** solenoid on, then on/off every `DROPPER_INTERVAL_MS` (500 ms).
-- **Running:** the SSR flips every `DROPPER_INTERVAL_MS`. HIGH is the bottom command.
-- **Stop:** commands the bottom position, then follows the position switch.
-- **Stopped:** if the switch changes, the valve follows it. HIGH on I1 means bottom.
+- **Running:** the SSR flips every `DROPPER_INTERVAL_MS`. The I4 switch is ignored while running.
+- **Stop:** commands the up position, then follows the I4 switch.
+- **Stopped:** if the switch changes, the valve follows it. HIGH on I4 means up (solenoid on); LOW means down (solenoid off). Each change prints `dropper switch: UP` / `DOWN` to serial.
 
 ### Steering disc
 
-- **Start:** solenoid on, then on/off every `DISC_INTERVAL_MS` (500 ms).
+- **Start:** solenoid on, then on/off every toggle half-period.
 - **Stop:** valve off.
+- **Stroke time:** the I5 pot sets the toggle half-period, mapped from `POT_INTERVAL_MIN_MS`–`POT_INTERVAL_MAX_MS` (500–4000 ms). Read continuously, even while stopped, so you can preview it before starting. Prints `back test stroke time: <ms> ms` whenever the reading moves by at least `POT_REPORT_DELTA_MS`.
 
 The main loop waits `LOOP_DELAY_MS` (20 ms) between passes. Each button has its own debounce (`BUTTON_DEBOUNCE_MS`).
 
@@ -197,9 +209,9 @@ The main loop waits `LOOP_DELAY_MS` (20 ms) between passes. Each button has its 
 
 ```cpp
 namespace Pins {
-    constexpr int DROP_SWITCH    = A0;  // I1
     constexpr int DROPPER_BUTTON = A1;  // I2
     constexpr int DISC_BUTTON    = A2;  // I3
+    constexpr int DROP_SWITCH    = A3;  // I4
     constexpr int MOTOR_SWITCH   = A6;  // I7
     constexpr int DROPPER_SSR     = 0;  // O1
     constexpr int DISC_SSR        = 1;  // O2
@@ -213,11 +225,12 @@ namespace Pins {
 | Constant | Default | Use |
 |---|---|---|
 | `DROPPER_INTERVAL_MS` | 1000 | dropper on/off half-period |
-| `DISC_INTERVAL_MS` | 1000 | back-test on/off half-period |
+| `DISC_INTERVAL_MS` | 1000 | back-test on/off half-period, used only if `USE_POT` is off |
 | `LOOP_DELAY_MS` | 20 | pause at the end of `loop()` |
 | `BUTTON_DEBOUNCE_MS` | 40 | debounce for both external buttons |
+| `POT_REPORT_DELTA_MS` | 20 | minimum change before a new pot reading is printed |
 
-`USE_POT` is `false`. The steering-disc interval stays fixed. A5 (I6) is reserved if the potentiometer is enabled later.
+`USE_POT` is `true`. The 10 kΩ pot on `POT_PIN` (A4, I5) sets the back-test toggle half-period, mapped from `POT_INTERVAL_MIN_MS` to `POT_INTERVAL_MAX_MS` (500–4000 ms).
 
 ### Motor kinematics
 

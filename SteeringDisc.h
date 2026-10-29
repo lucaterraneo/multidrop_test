@@ -18,10 +18,12 @@ private:
     bool running;
     bool solenoidOn;
     unsigned long lastToggleMs;
+    long lastReportedIntervalMs;
 
     void writeValve();
     void writeLed();
     void runCycle();
+    void reportPotIfChanged();
     unsigned long intervalMs() const;
 
 public:

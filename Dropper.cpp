@@ -14,12 +14,12 @@ Dropper::Dropper(
 
     running = false;
     solenoidOn = false;
-    lastSwitchBottom = false;
+    lastSwitchUp = false;
     lastToggleMs = 0;
 }
 
 void Dropper::writeValve() {
-    // SSR HIGH applies 24 V to the coil. That command is the bottom position.
+    // SSR HIGH applies 24 V to the coil. That command drives the dropper up.
     expansion->digitalWrite(ssr, solenoidOn ? HIGH : LOW);
     expansion->updateDigitalOutputs();
 }
@@ -33,8 +33,8 @@ void Dropper::writeLed() {
 void Dropper::begin() {
     pinMode(switchPin, INPUT);
 
-    lastSwitchBottom = digitalRead(switchPin) == HIGH;
-    solenoidOn = lastSwitchBottom;
+    lastSwitchUp = digitalRead(switchPin) == HIGH;
+    solenoidOn = lastSwitchUp;
     writeValve();
     writeLed();
 }
@@ -59,14 +59,15 @@ void Dropper::followSwitch() {
         return;
     }
 
-    bool switchBottom = digitalRead(switchPin) == HIGH;
-    if (switchBottom == lastSwitchBottom) {
+    bool switchUp = digitalRead(switchPin) == HIGH;
+    if (switchUp == lastSwitchUp) {
         return;
     }
 
-    lastSwitchBottom = switchBottom;
-    solenoidOn = switchBottom;
+    lastSwitchUp = switchUp;
+    solenoidOn = switchUp;
     writeValve();
+    Serial.println(switchUp ? "dropper switch: UP" : "dropper switch: DOWN");
 }
 
 void Dropper::start() {
@@ -81,7 +82,7 @@ void Dropper::stop() {
     running = false;
     solenoidOn = true;
     writeValve();
-    lastSwitchBottom = digitalRead(switchPin) == HIGH;
+    lastSwitchUp = digitalRead(switchPin) == HIGH;
     writeLed();
 }
 

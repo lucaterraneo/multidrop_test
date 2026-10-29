@@ -18,7 +18,7 @@ private:
 
     bool running;
     bool solenoidOn;
-    bool lastSwitchBottom;
+    bool lastSwitchUp;
     unsigned long lastToggleMs;
 
     void writeValve();

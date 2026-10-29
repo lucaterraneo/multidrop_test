@@ -38,6 +38,11 @@ void onDropperButton() {
         return;
     }
 
+    if (drumMotor.isOn()) {
+        Serial.println("dropper blocked: multidrum running");
+        return;
+    }
+
     dropper.start();
     Serial.println("dropper on");
 }
@@ -73,8 +78,14 @@ void loop() {
         onDiscButton();
     }
 
+    drumMotor.update();
+
+    if (drumMotor.isOn() && dropper.isRunning()) {
+        dropper.stop();
+        Serial.println("dropper stopped: multidrum running");
+    }
+
     dropper.update();
     steeringDisc.update();
-    drumMotor.update();
     delay(Config::Timing::LOOP_DELAY_MS);
 }

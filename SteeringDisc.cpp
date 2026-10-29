@@ -13,6 +13,7 @@ SteeringDisc::SteeringDisc(
     running = false;
     solenoidOn = false;
     lastToggleMs = 0;
+    lastReportedIntervalMs = -1;
 }
 
 void SteeringDisc::writeValve() {
@@ -48,6 +49,23 @@ unsigned long SteeringDisc::intervalMs() const {
     );
 }
 
+void SteeringDisc::reportPotIfChanged() {
+    if (!Config::USE_POT) {
+        return;
+    }
+
+    long current = (long) intervalMs();
+    if (lastReportedIntervalMs >= 0 &&
+        abs(current - lastReportedIntervalMs) < (long) Config::Timing::POT_REPORT_DELTA_MS) {
+        return;
+    }
+
+    lastReportedIntervalMs = current;
+    Serial.print("back test stroke time: ");
+    Serial.print(current);
+    Serial.println(" ms");
+}
+
 void SteeringDisc::runCycle() {
     if (!running) {
         return;
@@ -79,6 +97,7 @@ void SteeringDisc::stop() {
 }
 
 void SteeringDisc::update() {
+    reportPotIfChanged();
     runCycle();
 }
 
